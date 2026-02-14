@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 
 export class SprintRepository {
-  constructor(private db: Database.Database) {}
+  constructor(private db: Database.Database) { }
 
   list() {
     return this.db.prepare('SELECT * FROM sprints ORDER BY start_date DESC').all();
@@ -31,10 +31,22 @@ export class SprintRepository {
 
     // When sprint is completed, move unfinished stories back to backlog
     if (data.status === 'Completed') {
-      this.db.prepare(`
-        UPDATE stories SET sprint_id = NULL, updated_at = datetime('now')
-        WHERE sprint_id = ? AND status NOT IN ('Resolved', 'Closed', 'Deployed')
-      `).run(id);
+      const completedStatuses = this.db.prepare('SELECT name FROM statuses WHERE is_completed = 1').all() as { name: string }[];
+      const completedStatusNames = completedStatuses.map(s => s.name);
+
+      if (completedStatusNames.length > 0) {
+        const placeholders = completedStatusNames.map(() => '?').join(',');
+        this.db.prepare(`
+          UPDATE stories SET sprint_id = NULL, updated_at = datetime('now')
+          WHERE sprint_id = ? AND status NOT IN (${placeholders})
+        `).run(id, ...completedStatusNames);
+      } else {
+        // If no statuses are marked as completed, move all stories to backlog
+        this.db.prepare(`
+          UPDATE stories SET sprint_id = NULL, updated_at = datetime('now')
+          WHERE sprint_id = ?
+        `).run(id);
+      }
     }
 
     return this.get(id);

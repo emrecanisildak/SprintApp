@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Project } from '../../types';
 import { api } from '../../hooks/useDB';
+import StatusSettings from './StatusSettings';
 
 interface Props {
   project: Project;
@@ -46,6 +47,8 @@ export default function ProjectSettings({ project, onUpdate }: Props) {
           {saved ? 'Saved!' : 'Save Settings'}
         </button>
       </div>
+
+      <StatusSettings project={project} />
     </div>
   );
 }

@@ -11,6 +11,7 @@ import SprintReport from './components/report/SprintReport';
 import ProjectSettings from './components/project/ProjectSettings';
 import DeveloperList from './components/project/DeveloperList';
 import ProjectForm from './components/project/ProjectForm';
+import EpicsView from './components/epics/EpicsView';
 
 export default function App() {
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
@@ -56,6 +57,7 @@ export default function App() {
             <Route path="/sprint/:sprintId/planning" element={<SprintPlanning projectId={currentProject.id} project={currentProject} />} />
             <Route path="/sprint/:sprintId/board" element={<SprintBoard projectId={currentProject.id} />} />
             <Route path="/sprint/:sprintId/report" element={<SprintReport projectId={currentProject.id} project={currentProject} />} />
+            <Route path="/epics" element={<EpicsView projectId={currentProject.id} project={currentProject} />} />
             <Route path="/developers" element={<DeveloperList projectId={currentProject.id} />} />
             <Route path="/settings" element={<ProjectSettings project={currentProject} onUpdate={p => setCurrentProject(p)} />} />
             <Route path="*" element={<BacklogView projectId={currentProject.id} project={currentProject} />} />

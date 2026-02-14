@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Story, Epic, Developer } from '../../types';
+import { Story, Epic, Developer, Status } from '../../types';
+import { api } from '../../hooks/useDB';
 
 interface Props {
+  projectId: number;
   story?: Story | null;
   epics: Epic[];
   developers: Developer[];
@@ -9,22 +11,34 @@ interface Props {
   onCancel: () => void;
 }
 
-export default function StoryForm({ story, epics, developers, onSave, onCancel }: Props) {
+export default function StoryForm({ projectId, story, epics, developers, onSave, onCancel }: Props) {
   const [title, setTitle] = useState(story?.title || '');
   const [description, setDescription] = useState(story?.description || '');
   const [storyPoints, setStoryPoints] = useState<string>(story?.story_points?.toString() || '');
   const [epicId, setEpicId] = useState<string>(story?.epic_id?.toString() || '');
   const [assigneeId, setAssigneeId] = useState<string>(story?.assignee_id?.toString() || '');
+  const [status, setStatus] = useState<string>(story?.status || '');
+  const [statuses, setStatuses] = useState<Status[]>([]);
 
   useEffect(() => {
+    api.status.list(projectId).then(data => {
+      setStatuses(data);
+      // If creating new story and no status set, set default
+      if (!story && !status) {
+        const defaultStatus = data.find(s => s.is_default);
+        if (defaultStatus) setStatus(defaultStatus.name);
+      }
+    });
+
     if (story) {
       setTitle(story.title);
       setDescription(story.description || '');
       setStoryPoints(story.story_points?.toString() || '');
       setEpicId(story.epic_id?.toString() || '');
       setAssigneeId(story.assignee_id?.toString() || '');
+      setStatus(story.status || '');
     }
-  }, [story]);
+  }, [projectId, story]);
 
   const handleSubmit = () => {
     if (!title.trim()) return;
@@ -34,6 +48,7 @@ export default function StoryForm({ story, epics, developers, onSave, onCancel }
       story_points: storyPoints ? Number(storyPoints) : undefined,
       epic_id: epicId ? Number(epicId) : null,
       assignee_id: assigneeId ? Number(assigneeId) : null,
+      status: status || undefined,
     });
   };
 
@@ -43,11 +58,18 @@ export default function StoryForm({ story, epics, developers, onSave, onCancel }
         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" autoFocus />
       <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Description (optional)"
         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" rows={2} />
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-4 gap-3">
         <div>
           <label className="block text-xs text-gray-500 mb-1">Story Points</label>
           <input type="number" value={storyPoints} onChange={e => setStoryPoints(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Status</label>
+          <select value={status} onChange={e => setStatus(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            {statuses.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+          </select>
         </div>
         <div>
           <label className="block text-xs text-gray-500 mb-1">Epic</label>

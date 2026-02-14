@@ -41,11 +41,19 @@ const api = {
     unassignStory: (projectId: number, storyId: number) => ipcRenderer.invoke('sprintStory:unassignStory', projectId, storyId),
     getSprintStats: (projectId: number, sprintId: number) => ipcRenderer.invoke('sprintStory:getSprintStats', projectId, sprintId),
   },
+  status: {
+    list: (projectId: number) => ipcRenderer.invoke('status:list', projectId),
+    create: (projectId: number, data: any) => ipcRenderer.invoke('status:create', projectId, data),
+    update: (projectId: number, id: number, data: any) => ipcRenderer.invoke('status:update', projectId, id, data),
+    delete: (projectId: number, id: number) => ipcRenderer.invoke('status:delete', projectId, id),
+  },
   exportPdf: {
     printPage: (projectId: number, sprintId: number) => ipcRenderer.invoke('export:printPage', projectId, sprintId),
     saveSprintPlan: (projectId: number, sprintId: number) => ipcRenderer.invoke('export:saveSprintPlan', projectId, sprintId),
     exportCsv: (projectId: number, sprintId: number) => ipcRenderer.invoke('export:csv', projectId, sprintId),
     importCsv: (projectId: number, sprintId: number) => ipcRenderer.invoke('export:importCsv', projectId, sprintId),
+    importBacklogCsv: (projectId: number) => ipcRenderer.invoke('export:importBacklogCsv', projectId),
+    importStatusCsv: (projectId: number, sprintId: number) => ipcRenderer.invoke('export:importStatusCsv', projectId, sprintId),
   },
 };
 

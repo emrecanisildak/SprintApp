@@ -59,5 +59,29 @@ export function runProjectMigrations(db: Database.Database): void {
       allocation_percent INTEGER DEFAULT 100,
       UNIQUE(sprint_id, developer_id)
     );
+
+    CREATE TABLE IF NOT EXISTS statuses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      color TEXT NOT NULL,
+      is_default BOOLEAN DEFAULT 0,
+      is_completed BOOLEAN DEFAULT 0,
+      position INTEGER DEFAULT 0,
+      UNIQUE(name)
+    );
   `);
+
+  const count = db.prepare('SELECT COUNT(*) as count FROM statuses').get() as { count: number };
+  if (count.count === 0) {
+    const insert = db.prepare('INSERT INTO statuses (name, color, is_default, is_completed, position) VALUES (?, ?, ?, ?, ?)');
+    const defaults: [string, string, number, number, number][] = [
+      ['Open', '#6B7280', 1, 0, 0], // Gray
+      ['In Progress', '#3B82F6', 0, 0, 1], // Blue
+      ['On Hold', '#F59E0B', 0, 0, 2], // Amber
+      ['Resolved', '#10B981', 0, 1, 3], // Emerald
+      ['Closed', '#059669', 0, 1, 4], // Green
+      ['Deployed', '#7C3AED', 0, 1, 5] // Violet
+    ];
+    defaults.forEach(d => insert.run(...d));
+  }
 }

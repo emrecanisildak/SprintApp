@@ -9,6 +9,7 @@ import { EpicRepository } from './db/repositories/epic';
 import { StoryRepository } from './db/repositories/story';
 import { SprintRepository } from './db/repositories/sprint';
 import { SprintStoryRepository } from './db/repositories/sprintStory';
+import { StatusRepository } from './db/repositories/statusRepository';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -74,8 +75,15 @@ function setupIpcHandlers() {
       story: new StoryRepository(db),
       sprint: new SprintRepository(db),
       sprintStory: new SprintStoryRepository(db),
+      status: new StatusRepository(db),
     };
   }
+
+  // Status handlers
+  ipcMain.handle('status:list', (_, projectId) => getProjectRepos(projectId).status.list());
+  ipcMain.handle('status:create', (_, projectId, data) => getProjectRepos(projectId).status.create(data));
+  ipcMain.handle('status:update', (_, projectId, id, data) => getProjectRepos(projectId).status.update(id, data));
+  ipcMain.handle('status:delete', (_, projectId, id) => getProjectRepos(projectId).status.delete(id));
 
   // Developer handlers
   ipcMain.handle('developer:list', (_, projectId) => getProjectRepos(projectId).developer.list());
@@ -113,180 +121,31 @@ function setupIpcHandlers() {
   // === Export handlers ===
   ipcMain.handle('export:printPage', async (_, projectId: number, sprintId: number) => {
     if (!mainWindow) return { success: false };
+
+    // Get sprint name for default filename
     const repos = getProjectRepos(projectId);
-    const project = projectRepo.get(projectId) as any;
     const sprint = repos.sprint.get(sprintId) as any;
-    if (!project || !sprint) return { success: false };
-
-    const stats = repos.sprintStory.getSprintStats(sprintId) as any;
-    const members = repos.sprintStory.getMembers(sprintId) as any[];
-    const spHours = project.story_point_hours;
-    const dailyHours = project.daily_hours;
-    const totalCapacity = members.reduce((sum: number, m: any) =>
-      sum + (sprint.duration_days * dailyHours * (m.allocation_percent / 100)) / spHours, 0);
-
-    const completedStatuses = ['Resolved', 'Closed', 'Deployed'];
-
-    // Status colors
-    const statusColors: Record<string, string> = {
-      'Open': '#9CA3AF', 'In Progress': '#3B82F6', 'On Hold': '#F59E0B',
-      'Resolved': '#22C55E', 'Closed': '#8B5CF6', 'Deployed': '#14B8A6',
-    };
-
-    // Build status bar chart HTML
-    const statusEntries = Object.entries(stats.status_points as Record<string, number>);
-    const maxStatusPts = Math.max(...statusEntries.map(([,v]) => v), 1);
-    const statusBarsHtml = statusEntries.map(([status, pts]) => {
-      const pct = Math.round((pts / maxStatusPts) * 100);
-      const color = statusColors[status] || '#9CA3AF';
-      const count = (stats.status_counts as Record<string, number>)[status] || 0;
-      return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-        <span style="width:90px;font-size:11px;text-align:right;color:#6b7280;">${status}</span>
-        <div style="flex:1;background:#f3f4f6;border-radius:4px;height:20px;position:relative;">
-          <div style="width:${pct}%;background:${color};height:100%;border-radius:4px;"></div>
-        </div>
-        <span style="width:60px;font-size:11px;color:#374151;">${pts} SP (${count})</span>
-      </div>`;
-    }).join('');
-
-    // Build epic bar chart HTML
-    const epicBarsHtml = (stats.epic_stats as any[]).map((e: any) => {
-      const maxEpicPts = Math.max(...(stats.epic_stats as any[]).map((x: any) => x.total_points), 1);
-      const totalPct = Math.round((e.total_points / maxEpicPts) * 100);
-      const completedPct = e.total_points > 0 ? Math.round((e.completed_points / e.total_points) * 100) : 0;
-      return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-        <span style="width:110px;font-size:11px;text-align:right;display:flex;align-items:center;justify-content:flex-end;gap:4px;">
-          <span style="width:10px;height:10px;border-radius:50%;background:${e.color};display:inline-block;"></span>
-          ${e.name}
-        </span>
-        <div style="flex:1;background:#f3f4f6;border-radius:4px;height:20px;position:relative;">
-          <div style="width:${totalPct}%;background:${e.color}40;height:100%;border-radius:4px;position:absolute;"></div>
-          <div style="width:${Math.round((e.completed_points / maxEpicPts) * 100)}%;background:${e.color};height:100%;border-radius:4px;position:absolute;"></div>
-        </div>
-        <span style="width:90px;font-size:11px;color:#374151;">${e.completed_points}/${e.total_points} SP (${completedPct}%)</span>
-      </div>`;
-    }).join('');
-
-    // Build developer table
-    const devRows = (stats.developer_stats as any[]).map((d: any) => {
-      const pct = d.total_points > 0 ? Math.round((d.completed_points / d.total_points) * 100) : 0;
-      return `<tr>
-        <td><strong>${d.name}</strong></td>
-        <td>${d.story_count}</td>
-        <td>${d.total_points}</td>
-        <td>${d.completed_points}</td>
-        <td>
-          <div style="display:flex;align-items:center;gap:6px;">
-            <div style="flex:1;background:#e5e7eb;border-radius:4px;height:12px;">
-              <div style="width:${pct}%;background:#22c55e;height:100%;border-radius:4px;"></div>
-            </div>
-            <span style="font-size:11px;font-weight:600;">${pct}%</span>
-          </div>
-        </td>
-      </tr>`;
-    }).join('');
-
-    // Story list table
-    const storyRows = (stats.stories as any[]).map((s: any, i: number) => {
-      const sc = statusColors[s.status] || '#9CA3AF';
-      return `<tr>
-        <td>${i + 1}</td>
-        <td>${s.title}</td>
-        <td>${s.epic_name || '-'}</td>
-        <td>${s.assignee_name || '-'}</td>
-        <td style="text-align:center;">${s.story_points ?? '-'}</td>
-        <td><span style="background:${sc}20;color:${sc};padding:2px 8px;border-radius:4px;font-size:11px;">${s.status}</span></td>
-      </tr>`;
-    }).join('');
-
-    const completionPct = stats.completion_percent;
-
-    const html = `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>${sprint.name} - Report</title>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 32px 40px; color: #1f2937; font-size: 12px; }
-  h1 { font-size: 22px; margin-bottom: 2px; }
-  h2 { font-size: 14px; margin-top: 24px; margin-bottom: 10px; border-bottom: 2px solid #e5e7eb; padding-bottom: 4px; color: #374151; }
-  .meta { color: #6b7280; margin-bottom: 20px; font-size: 11px; }
-  .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; }
-  .card { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; text-align: center; }
-  .card .val { font-size: 26px; font-weight: 700; line-height: 1.2; }
-  .card .val.green { color: #16a34a; }
-  .card .val.blue { color: #2563eb; }
-  .card .lbl { font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; }
-  .progress-wrap { background: #e5e7eb; border-radius: 6px; height: 18px; margin: 6px 0 16px; position: relative; overflow: hidden; }
-  .progress-fill { height: 100%; border-radius: 6px; background: #22c55e; }
-  .progress-text { position: absolute; right: 8px; top: 1px; font-size: 11px; font-weight: 600; color: #374151; }
-  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 16px; }
-  .section { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px; }
-  .section h3 { font-size: 12px; font-weight: 600; margin-bottom: 10px; color: #374151; }
-  table { width: 100%; border-collapse: collapse; }
-  th { background: #f3f4f6; text-align: left; padding: 6px 8px; font-size: 11px; border-bottom: 2px solid #d1d5db; }
-  td { padding: 6px 8px; border-bottom: 1px solid #e5e7eb; font-size: 11px; }
-  .footer { margin-top: 24px; text-align: center; color: #9ca3af; font-size: 10px; }
-  @page { size: A4; margin: 10mm; }
-</style>
-</head><body>
-
-<h1>${sprint.name} - Sprint Report</h1>
-<div class="meta">${project.name} | ${sprint.start_date} | ${sprint.duration_days} business days | 1 SP = ${spHours}h | Daily: ${dailyHours}h</div>
-
-<div class="grid4">
-  <div class="card"><div class="val">${stats.total_stories}</div><div class="lbl">Stories</div></div>
-  <div class="card"><div class="val">${stats.total_points}</div><div class="lbl">Total SP</div></div>
-  <div class="card"><div class="val green">${stats.completed_points}</div><div class="lbl">Completed SP</div></div>
-  <div class="card"><div class="val blue">${totalCapacity.toFixed(1)}</div><div class="lbl">Capacity SP</div></div>
-</div>
-
-<div style="font-size:12px;font-weight:600;margin-bottom:4px;">Completion: ${completionPct}%</div>
-<div class="progress-wrap">
-  <div class="progress-fill" style="width:${completionPct}%"></div>
-  <div class="progress-text">${stats.completed_points} / ${stats.total_points} SP</div>
-</div>
-
-<div class="grid2">
-  <div class="section">
-    <h3>Status Distribution</h3>
-    ${statusBarsHtml}
-  </div>
-  <div class="section">
-    <h3>Epic Breakdown</h3>
-    ${epicBarsHtml}
-  </div>
-</div>
-
-<h2>Developer Statistics</h2>
-<table>
-  <tr><th>Developer</th><th>Stories</th><th>Total SP</th><th>Completed SP</th><th style="width:35%">Progress</th></tr>
-  ${devRows}
-</table>
-
-<h2>All Stories</h2>
-<table>
-  <tr><th>#</th><th>Title</th><th>Epic</th><th>Assignee</th><th style="text-align:center;">SP</th><th>Status</th></tr>
-  ${storyRows}
-</table>
-
-<div class="footer">Generated by SprintApp on ${new Date().toLocaleDateString()} | ${sprint.name} | ${project.name}</div>
-</body></html>`;
+    const defaultName = sprint ? `${sprint.name.replace(/\s+/g, '_')}_report.pdf` : 'sprint_report.pdf';
 
     const { filePath } = await dialog.showSaveDialog(mainWindow, {
-      defaultPath: `${sprint.name.replace(/\s+/g, '_')}_report.pdf`,
+      defaultPath: defaultName,
       filters: [{ name: 'PDF', extensions: ['pdf'] }],
     });
+
     if (!filePath) return { success: false, cancelled: true };
 
-    const printWin = new BrowserWindow({ show: false, width: 794, height: 1123 });
-    await printWin.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
-    const pdfData = await printWin.webContents.printToPDF({
-      printBackground: true,
-      landscape: false,
-      margins: { marginType: 'default' },
-    });
-    printWin.close();
-    fs.writeFileSync(filePath, pdfData);
-    return { success: true, filePath };
+    try {
+      const pdfData = await mainWindow.webContents.printToPDF({
+        printBackground: true,
+        landscape: false,
+        margins: { marginType: 'default' },
+      });
+      fs.writeFileSync(filePath, pdfData);
+      return { success: true, filePath };
+    } catch (error) {
+      console.error('Failed to generate PDF:', error);
+      return { success: false, error: String(error) };
+    }
   });
 
   ipcMain.handle('export:saveSprintPlan', async (_, projectId: number, sprintId: number) => {
@@ -363,21 +222,21 @@ function setupIpcHandlers() {
 <table>
   <tr><th>Developer</th><th>Allocation</th><th>Capacity (SP)</th><th>Assigned SP</th><th>Stories</th></tr>
   ${Object.values(byDev).map(d => {
-    const assignedPts = d.stories.reduce((sum: number, s: any) => sum + (s.story_points || 0), 0);
-    return `<tr>
+      const assignedPts = d.stories.reduce((sum: number, s: any) => sum + (s.story_points || 0), 0);
+      return `<tr>
       <td><strong>${d.name}</strong></td>
       <td>${d.allocation}%</td>
       <td>${d.capacity.toFixed(1)}</td>
       <td>${assignedPts}</td>
       <td>${d.stories.length}</td>
     </tr>`;
-  }).join('')}
+    }).join('')}
 </table>
 
 ${Object.values(byDev).map(d => {
-    const assignedPts = d.stories.reduce((sum: number, s: any) => sum + (s.story_points || 0), 0);
-    const pct = d.capacity > 0 ? Math.min(100, Math.round((assignedPts / d.capacity) * 100)) : 0;
-    return `
+      const assignedPts = d.stories.reduce((sum: number, s: any) => sum + (s.story_points || 0), 0);
+      const pct = d.capacity > 0 ? Math.min(100, Math.round((assignedPts / d.capacity) * 100)) : 0;
+      return `
 <h2>${d.name}</h2>
 <div class="dev-header">
   <span class="info">Allocation: ${d.allocation}% | Capacity: ${d.capacity.toFixed(1)} SP | Assigned: ${assignedPts} SP (${pct}%)</span>
@@ -393,7 +252,7 @@ ${Object.values(byDev).map(d => {
     <td>${s.epic_name || '-'}</td>
   </tr>`).join('')}
 </table>`;
-  }).join('')}
+    }).join('')}
 
 ${unassigned.length > 0 ? `
 <h2>Unassigned Stories</h2>
@@ -547,21 +406,228 @@ ${unassigned.length > 0 ? `
       }
 
       const storyPoints = spStr ? Number(spStr) : null;
-      const validStatuses = ['Open', 'In Progress', 'On Hold', 'Resolved', 'Closed', 'Deployed'];
-      const status = (statusStr && validStatuses.includes(statusStr)) ? statusStr : 'Open';
+      const validStatuses = repos.status.list().map(s => s.name);
+      const status = (statusStr && validStatuses.includes(statusStr)) ? statusStr : repos.status.getDefault().name;
 
-      repos.story.create({
-        title,
-        description: description || undefined,
-        story_points: storyPoints ?? undefined,
-        epic_id: epicId ?? undefined,
-        assignee_id: assigneeId ?? undefined,
-        sprint_id: sprintId,
-        status,
-      });
+      // Check if story with same title already exists in this sprint
+      const existingStories = repos.story.list({ sprint_id: sprintId }) as any[];
+      const existingStory = existingStories.find((s: any) => s.title.toLowerCase() === title.toLowerCase());
+
+      if (existingStory) {
+        repos.story.update(existingStory.id, {
+          description: description || existingStory.description,
+          story_points: storyPoints ?? existingStory.story_points,
+          epic_id: epicId ?? existingStory.epic_id,
+          assignee_id: assigneeId ?? existingStory.assignee_id,
+          status,
+        });
+      } else {
+        repos.story.create({
+          title,
+          description: description || undefined,
+          story_points: storyPoints ?? undefined,
+          epic_id: epicId ?? undefined,
+          assignee_id: assigneeId ?? undefined,
+          sprint_id: sprintId,
+          status,
+        });
+      }
       imported++;
     }
 
     return { success: true, imported };
+  });
+
+  ipcMain.handle('export:importBacklogCsv', async (_, projectId: number) => {
+    if (!mainWindow) return { success: false };
+    const { filePaths } = await dialog.showOpenDialog(mainWindow, {
+      filters: [{ name: 'CSV', extensions: ['csv'] }],
+      properties: ['openFile'],
+    });
+    if (!filePaths || filePaths.length === 0) return { success: false, cancelled: true };
+
+    const content = fs.readFileSync(filePaths[0], 'utf-8').replace(/^\uFEFF/, '');
+    const lines = content.split(/\r?\n/).filter(l => l.trim());
+    if (lines.length < 2) return { success: false, error: 'CSV is empty' };
+
+    const repos = getProjectRepos(projectId);
+
+    function parseCsvLine(line: string): string[] {
+      const result: string[] = [];
+      let current = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (inQuotes) {
+          if (ch === '"' && line[i + 1] === '"') { current += '"'; i++; }
+          else if (ch === '"') { inQuotes = false; }
+          else { current += ch; }
+        } else {
+          if (ch === '"') { inQuotes = true; }
+          else if (ch === ',') { result.push(current.trim()); current = ''; }
+          else { current += ch; }
+        }
+      }
+      result.push(current.trim());
+      return result;
+    }
+
+    const dataRows = lines.slice(1);
+    let imported = 0;
+
+    for (const line of dataRows) {
+      const cols = parseCsvLine(line);
+      if (cols.length < 2) continue;
+
+      const [epicName, title, description, developerName, spStr, statusStr] = cols;
+      if (!title) continue;
+
+      // Find or create epic
+      let epicId: number | null = null;
+      if (epicName) {
+        const existingEpics = repos.epic.list() as any[];
+        let epic = existingEpics.find((e: any) => e.name.toLowerCase() === epicName.toLowerCase());
+        if (!epic) {
+          epic = repos.epic.create({ name: epicName });
+        }
+        epicId = epic.id;
+      }
+
+      // Find or create developer
+      let assigneeId: number | null = null;
+      if (developerName) {
+        const existingDevs = repos.developer.list() as any[];
+        let dev = existingDevs.find((d: any) => d.name.toLowerCase() === developerName.toLowerCase());
+        if (!dev) {
+          dev = repos.developer.create({ name: developerName });
+        }
+        assigneeId = dev.id;
+      }
+
+      // Find or create status
+      const storyPoints = spStr ? Number(spStr) : null;
+      let status: string;
+      if (statusStr) {
+        const existingStatuses = repos.status.list();
+        const statusExists = existingStatuses.find(s => s.name.toLowerCase() === statusStr.toLowerCase());
+        if (!statusExists) {
+          const maxPos = existingStatuses.length > 0 ? Math.max(...existingStatuses.map(s => s.position)) : 0;
+          repos.status.create({
+            name: statusStr,
+            color: '#6B7280',
+            is_default: 0,
+            is_completed: 0,
+            position: maxPos + 1,
+          });
+        }
+        status = statusExists ? statusExists.name : statusStr;
+      } else {
+        status = repos.status.getDefault().name;
+      }
+
+      // Check if story with same title exists in backlog
+      const backlogStories = repos.story.list({ backlog: true }) as any[];
+      const existingStory = backlogStories.find((s: any) => s.title.toLowerCase() === title.toLowerCase());
+
+      if (existingStory) {
+        repos.story.update(existingStory.id, {
+          description: description || existingStory.description,
+          story_points: storyPoints ?? existingStory.story_points,
+          epic_id: epicId ?? existingStory.epic_id,
+          assignee_id: assigneeId ?? existingStory.assignee_id,
+          status,
+        });
+      } else {
+        repos.story.create({
+          title,
+          description: description || undefined,
+          story_points: storyPoints ?? undefined,
+          epic_id: epicId ?? undefined,
+          assignee_id: assigneeId ?? undefined,
+          status,
+        });
+      }
+      imported++;
+    }
+
+    return { success: true, imported };
+  });
+
+  ipcMain.handle('export:importStatusCsv', async (_, projectId: number, sprintId: number) => {
+    if (!mainWindow) return { success: false };
+    const { filePaths } = await dialog.showOpenDialog(mainWindow, {
+      filters: [{ name: 'CSV', extensions: ['csv'] }],
+      properties: ['openFile'],
+    });
+    if (!filePaths || filePaths.length === 0) return { success: false, cancelled: true };
+
+    const content = fs.readFileSync(filePaths[0], 'utf-8').replace(/^\uFEFF/, '');
+    const lines = content.split(/\r?\n/).filter(l => l.trim());
+    if (lines.length < 2) return { success: false, error: 'CSV is empty' };
+
+    const repos = getProjectRepos(projectId);
+    const stories = repos.story.list({ sprint_id: sprintId }) as any[];
+
+    function parseCsvLine(line: string): string[] {
+      const result: string[] = [];
+      let current = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (inQuotes) {
+          if (ch === '"' && line[i + 1] === '"') { current += '"'; i++; }
+          else if (ch === '"') { inQuotes = false; }
+          else { current += ch; }
+        } else {
+          if (ch === '"') { inQuotes = true; }
+          else if (ch === ',') { result.push(current.trim()); current = ''; }
+          else { current += ch; }
+        }
+      }
+      result.push(current.trim());
+      return result;
+    }
+
+    // Detect column indices from header
+    const headerCols = parseCsvLine(lines[0]).map(h => h.toLowerCase());
+    let storyIdx = headerCols.indexOf('story');
+    let statusIdx = headerCols.indexOf('status');
+    // Fallback: if no header match, assume 2-column format (col 0 = story, col 1 = status)
+    if (storyIdx === -1) storyIdx = 0;
+    if (statusIdx === -1) statusIdx = 1;
+
+    const dataRows = lines.slice(1);
+    let updated = 0;
+
+    for (const line of dataRows) {
+      const cols = parseCsvLine(line);
+      const storyTitle = cols[storyIdx]?.trim();
+      const statusName = cols[statusIdx]?.trim();
+      if (!storyTitle || !statusName) continue;
+
+      // Find story by title in this sprint
+      const story = stories.find((s: any) => s.title.toLowerCase() === storyTitle.toLowerCase());
+      if (!story) continue;
+
+      // Ensure status exists in project
+      const existingStatuses = repos.status.list();
+      const statusExists = existingStatuses.find(s => s.name.toLowerCase() === statusName.toLowerCase());
+      if (!statusExists) {
+        const maxPos = existingStatuses.length > 0 ? Math.max(...existingStatuses.map(s => s.position)) : 0;
+        repos.status.create({
+          name: statusName,
+          color: '#6B7280',
+          is_default: 0,
+          is_completed: 0,
+          position: maxPos + 1,
+        });
+      }
+
+      const finalStatusName = statusExists ? statusExists.name : statusName;
+      repos.story.update(story.id, { status: finalStatusName });
+      updated++;
+    }
+
+    return { success: true, updated };
   });
 }

@@ -38,9 +38,9 @@ export interface Story {
   assignee_name?: string;
 }
 
-export type StoryStatus = 'Open' | 'In Progress' | 'On Hold' | 'Resolved' | 'Closed' | 'Deployed';
+export type StoryStatus = string;
 
-export const STORY_STATUSES: StoryStatus[] = ['Open', 'In Progress', 'On Hold', 'Resolved', 'Closed', 'Deployed'];
+// export const STORY_STATUSES: StoryStatus[] = ['Open', 'In Progress', 'On Hold', 'Resolved', 'Closed', 'Deployed'];
 
 export interface Sprint {
   id: number;
@@ -89,6 +89,15 @@ export interface DeveloperStat {
   story_count: number;
 }
 
+export interface Status {
+  id: number;
+  name: string;
+  color: string;
+  is_default: number;
+  is_completed: number;
+  position: number;
+}
+
 export interface ElectronAPI {
   project: {
     list: () => Promise<Project[]>;
@@ -130,11 +139,19 @@ export interface ElectronAPI {
     unassignStory: (projectId: number, storyId: number) => Promise<void>;
     getSprintStats: (projectId: number, sprintId: number) => Promise<SprintStats>;
   };
+  status: {
+    list: (projectId: number) => Promise<Status[]>;
+    create: (projectId: number, data: Partial<Status>) => Promise<Status>;
+    update: (projectId: number, id: number, data: Partial<Status>) => Promise<Status>;
+    delete: (projectId: number, id: number) => Promise<void>;
+  };
   exportPdf: {
     printPage: (projectId: number, sprintId: number) => Promise<{ success: boolean; filePath?: string; cancelled?: boolean }>;
     saveSprintPlan: (projectId: number, sprintId: number) => Promise<{ success: boolean; filePath?: string; cancelled?: boolean }>;
     exportCsv: (projectId: number, sprintId: number) => Promise<{ success: boolean; filePath?: string; cancelled?: boolean }>;
     importCsv: (projectId: number, sprintId: number) => Promise<{ success: boolean; imported?: number; cancelled?: boolean }>;
+    importBacklogCsv: (projectId: number) => Promise<{ success: boolean; imported?: number; cancelled?: boolean }>;
+    importStatusCsv: (projectId: number, sprintId: number) => Promise<{ success: boolean; updated?: number; cancelled?: boolean }>;
   };
 }
 

@@ -1,3 +1,30 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+    background: white;
+  }
+
+  /* Reset layout constraints for print */
+  .h-screen {
+    height: auto !important;
+    overflow: visible !important;
+  }
+  
+  .flex-1.overflow-hidden {
+    overflow: visible !important;
+  }
+
+  main.overflow-auto {
+    overflow: visible !important;
+    height: auto !important;
+  }
+}

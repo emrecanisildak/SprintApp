@@ -2,6 +2,56 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSprints, api } from '../../hooks/useDB';
 
+function ImportStatusCsvModal({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl shadow-xl p-6 w-[420px]">
+        <h3 className="text-lg font-bold mb-3">Import Status Update CSV</h3>
+        <p className="text-sm text-gray-600 mb-3">Jira'dan export edilen CSV ile story statuslerini güncelleyin. CSV aşağıdaki formatta olmalıdır:</p>
+        <div className="bg-gray-100 rounded-lg p-3 mb-3">
+          <p className="text-xs font-semibold text-gray-700 mb-1">Header:</p>
+          <p className="font-mono text-xs text-gray-800">Story,Status</p>
+        </div>
+        <div className="bg-gray-50 rounded-lg p-3 mb-3">
+          <p className="text-xs font-semibold text-gray-700 mb-1">Örnek:</p>
+          <p className="font-mono text-xs text-gray-800">Login page,In Progress</p>
+          <p className="font-mono text-xs text-gray-800">User settings,Done</p>
+        </div>
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+          <p className="text-xs text-yellow-800">Projede bulunmayan statusler otomatik olarak eklenecektir (completed olarak işaretlenmez).</p>
+        </div>
+        <div className="flex justify-end gap-2">
+          <button onClick={onCancel} className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+          <button onClick={onConfirm} className="px-4 py-2 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700">OK, Import</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ImportCsvModal({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl shadow-xl p-6 w-[420px]">
+        <h3 className="text-lg font-bold mb-3">Import CSV</h3>
+        <p className="text-sm text-gray-600 mb-3">CSV dosyanız aşağıdaki formatta olmalıdır:</p>
+        <div className="bg-gray-100 rounded-lg p-3 mb-3">
+          <p className="text-xs font-semibold text-gray-700 mb-1">Header:</p>
+          <p className="font-mono text-xs text-gray-800">Epic,Story,Description,Developer,Story Points,Status</p>
+        </div>
+        <div className="bg-gray-50 rounded-lg p-3 mb-4">
+          <p className="text-xs font-semibold text-gray-700 mb-1">Örnek Satır:</p>
+          <p className="font-mono text-xs text-gray-800">Auth,Login page,User login,John,3,Open</p>
+        </div>
+        <div className="flex justify-end gap-2">
+          <button onClick={onCancel} className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+          <button onClick={onConfirm} className="px-4 py-2 text-sm bg-orange-600 text-white rounded-lg hover:bg-orange-700">OK, Import</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface Props {
   projectId: number;
 }
@@ -30,6 +80,27 @@ export default function SprintList({ projectId }: Props) {
     if (!confirm('Delete this sprint?')) return;
     await api.sprint.delete(projectId, id);
     refresh();
+  };
+
+  const [importSprintId, setImportSprintId] = useState<number | null>(null);
+  const [importStatusSprintId, setImportStatusSprintId] = useState<number | null>(null);
+
+  const handleImport = async (sprintId: number) => {
+    setImportSprintId(null);
+    const result = await api.exportPdf.importCsv(projectId, sprintId);
+    if (result.success && result.imported) {
+      alert(`${result.imported} story imported.`);
+      refresh();
+    }
+  };
+
+  const handleImportStatus = async (sprintId: number) => {
+    setImportStatusSprintId(null);
+    const result = await api.exportPdf.importStatusCsv(projectId, sprintId);
+    if (result.success && result.updated) {
+      alert(`${result.updated} story status updated.`);
+      refresh();
+    }
   };
 
   const statusColors: Record<string, string> = {
@@ -92,14 +163,10 @@ export default function SprintList({ projectId }: Props) {
                 className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50">Report</button>
               <button onClick={() => api.exportPdf.exportCsv(projectId, sprint.id)}
                 className="px-3 py-1 text-sm border border-green-300 text-green-700 rounded hover:bg-green-50">Export CSV</button>
-              <button onClick={async () => {
-                const result = await api.exportPdf.importCsv(projectId, sprint.id);
-                if (result.success && result.imported) {
-                  alert(`${result.imported} story imported.`);
-                  refresh();
-                }
-              }}
+              <button onClick={() => setImportSprintId(sprint.id)}
                 className="px-3 py-1 text-sm border border-orange-300 text-orange-700 rounded hover:bg-orange-50">Import CSV</button>
+              <button onClick={() => setImportStatusSprintId(sprint.id)}
+                className="px-3 py-1 text-sm border border-purple-300 text-purple-700 rounded hover:bg-purple-50">Import Status</button>
               <button onClick={() => handleDelete(sprint.id)}
                 className="px-3 py-1 text-sm text-red-600 border border-red-200 rounded hover:bg-red-50">Delete</button>
             </div>
@@ -107,6 +174,19 @@ export default function SprintList({ projectId }: Props) {
         ))}
         {sprints.length === 0 && <p className="text-gray-400 text-center py-12">No sprints yet. Create one to start planning.</p>}
       </div>
+
+      {importSprintId !== null && (
+        <ImportCsvModal
+          onConfirm={() => handleImport(importSprintId)}
+          onCancel={() => setImportSprintId(null)}
+        />
+      )}
+      {importStatusSprintId !== null && (
+        <ImportStatusCsvModal
+          onConfirm={() => handleImportStatus(importStatusSprintId)}
+          onCancel={() => setImportStatusSprintId(null)}
+        />
+      )}
     </div>
   );
 }

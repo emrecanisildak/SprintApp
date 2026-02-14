@@ -1,24 +1,18 @@
-import { Story, STORY_STATUSES, StoryStatus } from '../../types';
+import { Story, Status } from '../../types';
 
 interface Props {
   story: Story;
-  onStatusChange: (id: number, status: StoryStatus) => void;
+  statuses: Status[];
+  onStatusChange: (id: number, status: string) => void;
   onEdit: (story: Story) => void;
   onDelete: (id: number) => void;
   onMoveToSprint?: (storyId: number) => void;
   onRemoveFromSprint?: (storyId: number) => void;
 }
 
-const statusColors: Record<string, string> = {
-  'Open': 'bg-gray-100 text-gray-700',
-  'In Progress': 'bg-blue-100 text-blue-700',
-  'On Hold': 'bg-yellow-100 text-yellow-700',
-  'Resolved': 'bg-green-100 text-green-700',
-  'Closed': 'bg-purple-100 text-purple-700',
-  'Deployed': 'bg-teal-100 text-teal-700',
-};
+export default function StoryCard({ story, statuses = [], onStatusChange, onEdit, onDelete, onMoveToSprint, onRemoveFromSprint }: Props) {
+  const statusColor = statuses?.find(s => s.name === story.status)?.color || '#9CA3AF';
 
-export default function StoryCard({ story, onStatusChange, onEdit, onDelete, onMoveToSprint, onRemoveFromSprint }: Props) {
   return (
     <div className="bg-white rounded-lg shadow p-4 border-l-4" style={{ borderColor: story.epic_color || '#e5e7eb' }}>
       <div className="flex items-start justify-between mb-2">
@@ -39,10 +33,11 @@ export default function StoryCard({ story, onStatusChange, onEdit, onDelete, onM
         {story.assignee_name && <span className="text-xs text-gray-500">👤 {story.assignee_name}</span>}
         <select
           value={story.status}
-          onChange={e => onStatusChange(story.id, e.target.value as StoryStatus)}
-          className={`text-xs px-2 py-0.5 rounded border-0 cursor-pointer ${statusColors[story.status] || ''}`}
+          onChange={e => onStatusChange(story.id, e.target.value)}
+          className="text-xs px-2 py-0.5 rounded border-0 cursor-pointer text-white font-medium"
+          style={{ backgroundColor: statusColor }}
         >
-          {STORY_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+          {statuses?.map(s => <option key={s.id} value={s.name} className="text-gray-800 bg-white">{s.name}</option>)}
         </select>
       </div>
       <div className="flex gap-2 mt-3 pt-2 border-t border-gray-100">

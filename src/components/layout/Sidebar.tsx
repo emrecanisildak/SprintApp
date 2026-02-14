@@ -9,6 +9,7 @@ interface Props {
 
 const navItems = [
   { path: '/backlog', label: 'Backlog', icon: '📋' },
+  { path: '/epics', label: 'Epics', icon: '🎯' },
   { path: '/sprints', label: 'Sprints', icon: '🏃' },
   { path: '/developers', label: 'Developers', icon: '👥' },
   { path: '/settings', label: 'Settings', icon: '⚙️' },
@@ -19,7 +20,7 @@ export default function Sidebar({ currentProject, onProjectChange }: Props) {
   const location = useLocation();
 
   return (
-    <div className="w-64 bg-gray-900 text-white flex flex-col">
+    <div className="w-64 bg-gray-900 text-white flex flex-col no-print">
       <div className="p-4 border-b border-gray-700">
         <h1 className="text-lg font-bold">SprintApp</h1>
         <button
@@ -38,11 +39,10 @@ export default function Sidebar({ currentProject, onProjectChange }: Props) {
           <button
             key={item.path}
             onClick={() => navigate(item.path)}
-            className={`w-full text-left px-4 py-3 rounded-lg mb-1 flex items-center gap-3 transition ${
-              location.pathname === item.path || location.pathname.startsWith(item.path.replace(/s$/, '/'))
-                ? 'bg-blue-600 text-white'
-                : 'text-gray-300 hover:bg-gray-800'
-            }`}
+            className={`w-full text-left px-4 py-3 rounded-lg mb-1 flex items-center gap-3 transition ${location.pathname === item.path || location.pathname.startsWith(item.path.replace(/s$/, '/'))
+              ? 'bg-blue-600 text-white'
+              : 'text-gray-300 hover:bg-gray-800'
+              }`}
           >
             <span>{item.icon}</span>
             {item.label}

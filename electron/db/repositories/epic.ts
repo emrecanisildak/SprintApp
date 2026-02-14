@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 
 export class EpicRepository {
-  constructor(private db: Database.Database) {}
+  constructor(private db: Database.Database) { }
 
   list() {
     return this.db.prepare('SELECT * FROM epics ORDER BY name').all();
@@ -12,6 +12,11 @@ export class EpicRepository {
   }
 
   create(data: { name: string; description?: string; color?: string }) {
+    const existing = this.db.prepare('SELECT id FROM epics WHERE name = ? COLLATE NOCASE').get(data.name);
+    if (existing) {
+      throw new Error('An epic with this name already exists');
+    }
+
     const result = this.db.prepare('INSERT INTO epics (name, description, color) VALUES (?, ?, ?)').run(
       data.name, data.description ?? null, data.color ?? '#3B82F6'
     );

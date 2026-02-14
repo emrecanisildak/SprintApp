@@ -21,12 +21,14 @@ export default function SprintPlanning({ projectId, project }: Props) {
   const { developers } = useDevelopers(projectId);
   const { epics } = useEpics(projectId);
   const { members, refresh: refreshMembers } = useSprintMembers(projectId, sid);
+  const [statuses, setStatuses] = useState<any[]>([]);
   const [showStoryForm, setShowStoryForm] = useState(false);
   const [editingStory, setEditingStory] = useState<Story | null>(null);
   const [allocations, setAllocations] = useState<Record<number, number>>({});
 
   useEffect(() => {
     api.sprint.get(projectId, sid).then(setSprint);
+    api.status.list(projectId).then(setStatuses);
   }, [projectId, sid]);
 
   useEffect(() => {
@@ -105,6 +107,8 @@ export default function SprintPlanning({ projectId, project }: Props) {
 
   if (!sprint) return <div className="text-gray-400">Loading...</div>;
 
+  const isCompleted = sprint.status === 'Completed';
+
   const membersList = Object.entries(allocations).map(([id, pct]) => ({
     developer_id: Number(id), allocation_percent: pct,
   } as SprintMember));
@@ -161,9 +165,9 @@ export default function SprintPlanning({ projectId, project }: Props) {
             const cap = isActive ? calculateIndividualCapacity(sprint.duration_days, project.daily_hours, pct, project.story_point_hours) : 0;
             return (
               <div key={dev.id} className="flex items-center gap-3">
-                <input type="checkbox" checked={isActive} onChange={() => handleToggleMember(dev.id)} />
+                <input type="checkbox" checked={isActive} onChange={() => handleToggleMember(dev.id)} disabled={isCompleted} />
                 <span className="w-32 text-sm">{dev.name}</span>
-                <input type="range" min={10} max={100} step={10} value={pct} disabled={!isActive}
+                <input type="range" min={10} max={100} step={10} value={pct} disabled={!isActive || isCompleted}
                   onChange={e => handleAllocationChange(dev.id, Number(e.target.value))}
                   className="flex-1" />
                 <span className="w-12 text-sm text-right">{pct}%</span>
@@ -172,8 +176,10 @@ export default function SprintPlanning({ projectId, project }: Props) {
             );
           })}
         </div>
-        <button onClick={handleSaveMembers}
-          className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">Save Members</button>
+        {!isCompleted && (
+          <button onClick={handleSaveMembers}
+            className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">Save Members</button>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-6">
@@ -183,8 +189,10 @@ export default function SprintPlanning({ projectId, project }: Props) {
           <div className="space-y-2 max-h-[600px] overflow-auto">
             {backlogStories.map((story: Story) => (
               <div key={story.id} className="flex items-center gap-2">
-                <button onClick={() => handleAssignStory(story.id)}
-                  className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200">→</button>
+                {!isCompleted && (
+                  <button onClick={() => handleAssignStory(story.id)}
+                    className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200">→</button>
+                )}
                 <div className="flex-1 bg-white rounded p-2 text-sm border border-gray-200">
                   <span className="font-medium">{story.title}</span>
                   {story.story_points != null && <span className="ml-2 text-xs text-blue-600">{story.story_points} SP</span>}
@@ -198,21 +206,34 @@ export default function SprintPlanning({ projectId, project }: Props) {
         <div>
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-semibold">Sprint Stories ({sprintStories.length} | {usedPoints} SP)</h3>
-            <button onClick={() => setShowStoryForm(!showStoryForm)}
-              className="text-sm text-blue-600 hover:text-blue-800">+ New</button>
+            {!isCompleted && (
+              <button onClick={() => setShowStoryForm(!showStoryForm)}
+                className="text-sm text-blue-600 hover:text-blue-800">+ New</button>
+            )}
           </div>
           {(showStoryForm || editingStory) && (
             <div className="mb-3">
-              <StoryForm story={editingStory} epics={epics} developers={developers} onSave={handleSaveStory}
-                onCancel={() => { setShowStoryForm(false); setEditingStory(null); }} />
+              <StoryForm
+                projectId={projectId}
+                story={editingStory}
+                epics={epics}
+                developers={developers}
+                onSave={handleSaveStory}
+                onCancel={() => { setShowStoryForm(false); setEditingStory(null); }}
+              />
             </div>
           )}
           <div className="space-y-2 max-h-[600px] overflow-auto">
             {sprintStories.map((story: Story) => (
-              <StoryCard key={story.id} story={story} onStatusChange={handleStatusChange}
+              <StoryCard
+                key={story.id}
+                story={story}
+                statuses={statuses}
+                onStatusChange={handleStatusChange}
                 onEdit={(s) => { setEditingStory(s); setShowStoryForm(false); }}
                 onDelete={async (id) => { await api.story.delete(projectId, id); refreshSprint(); }}
-                onRemoveFromSprint={handleUnassignStory} />
+                onRemoveFromSprint={handleUnassignStory}
+              />
             ))}
           </div>
         </div>
