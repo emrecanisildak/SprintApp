@@ -36,6 +36,92 @@ export class SprintStoryRepository {
     this.db.prepare("UPDATE stories SET sprint_id = NULL, updated_at = datetime('now') WHERE id = ?").run(storyId);
   }
 
+  getProjectStats(sprintIds: number[]) {
+    const completedStatuses = ['Resolved', 'Closed', 'Deployed'];
+
+    // Get all stories across all sprints
+    const allSprintStories = sprintIds.flatMap(sid =>
+      this.db.prepare(`
+        SELECT s.*, d.name as assignee_name, e.name as epic_name, e.color as epic_color
+        FROM stories s
+        LEFT JOIN developers d ON s.assignee_id = d.id
+        LEFT JOIN epics e ON s.epic_id = e.id
+        WHERE s.sprint_id = ?
+      `).all(sid) as any[]
+    );
+
+    // Get backlog stories (no sprint assigned)
+    const backlogStories = this.db.prepare(`
+      SELECT s.*, d.name as assignee_name, e.name as epic_name, e.color as epic_color
+      FROM stories s
+      LEFT JOIN developers d ON s.assignee_id = d.id
+      LEFT JOIN epics e ON s.epic_id = e.id
+      WHERE s.sprint_id IS NULL
+    `).all() as any[];
+
+    // Per-sprint stats
+    const sprintStats = sprintIds.map(sid => {
+      const stories = allSprintStories.filter((s: any) => s.sprint_id === sid);
+      const totalPoints = stories.reduce((sum: number, s: any) => sum + (s.story_points || 0), 0);
+      const completedPoints = stories.filter((s: any) => completedStatuses.includes(s.status))
+        .reduce((sum: number, s: any) => sum + (s.story_points || 0), 0);
+      return {
+        sprint_id: sid,
+        total_stories: stories.length,
+        completed_stories: stories.filter((s: any) => completedStatuses.includes(s.status)).length,
+        total_points: totalPoints,
+        completed_points: completedPoints,
+        completion_percent: totalPoints > 0 ? Math.round((completedPoints / totalPoints) * 100) : 0,
+      };
+    });
+
+    // Developer stats across all sprints
+    const developerStats: Record<number, { name: string; total_points: number; completed_points: number; story_count: number }> = {};
+    for (const s of allSprintStories) {
+      if (!s.assignee_id) continue;
+      if (!developerStats[s.assignee_id]) {
+        developerStats[s.assignee_id] = { name: s.assignee_name, total_points: 0, completed_points: 0, story_count: 0 };
+      }
+      developerStats[s.assignee_id].total_points += s.story_points || 0;
+      developerStats[s.assignee_id].story_count += 1;
+      if (completedStatuses.includes(s.status)) {
+        developerStats[s.assignee_id].completed_points += s.story_points || 0;
+      }
+    }
+
+    // Epic stats across all sprints
+    const epicStats: Record<string, { name: string; color: string; total_points: number; completed_points: number; story_count: number }> = {};
+    for (const s of allSprintStories) {
+      const key = s.epic_id ? String(s.epic_id) : '_none';
+      if (!epicStats[key]) {
+        epicStats[key] = { name: s.epic_name || 'No Epic', color: s.epic_color || '#9CA3AF', total_points: 0, completed_points: 0, story_count: 0 };
+      }
+      epicStats[key].total_points += s.story_points || 0;
+      epicStats[key].story_count += 1;
+      if (completedStatuses.includes(s.status)) {
+        epicStats[key].completed_points += s.story_points || 0;
+      }
+    }
+
+    const totalPoints = allSprintStories.reduce((sum: number, s: any) => sum + (s.story_points || 0), 0);
+    const completedPoints = allSprintStories.filter((s: any) => completedStatuses.includes(s.status))
+      .reduce((sum: number, s: any) => sum + (s.story_points || 0), 0);
+    const backlogPoints = backlogStories.reduce((sum: number, s: any) => sum + (s.story_points || 0), 0);
+
+    return {
+      total_sprints: sprintIds.length,
+      total_stories: allSprintStories.length,
+      total_points: totalPoints,
+      completed_points: completedPoints,
+      completion_percent: totalPoints > 0 ? Math.round((completedPoints / totalPoints) * 100) : 0,
+      backlog_stories: backlogStories.length,
+      backlog_points: backlogPoints,
+      sprint_stats: sprintStats,
+      developer_stats: Object.values(developerStats),
+      epic_stats: Object.values(epicStats),
+    };
+  }
+
   getSprintStats(sprintId: number) {
     const stories = this.db.prepare(`
       SELECT s.*, d.name as assignee_name, e.name as epic_name, e.color as epic_color

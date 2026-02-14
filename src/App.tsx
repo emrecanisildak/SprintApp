@@ -8,6 +8,7 @@ import SprintList from './components/sprint/SprintList';
 import SprintPlanning from './components/sprint/SprintPlanning';
 import SprintBoard from './components/sprint/SprintBoard';
 import SprintReport from './components/report/SprintReport';
+import ProjectReport from './components/report/ProjectReport';
 import ProjectSettings from './components/project/ProjectSettings';
 import DeveloperList from './components/project/DeveloperList';
 import ProjectForm from './components/project/ProjectForm';
@@ -57,6 +58,7 @@ export default function App() {
             <Route path="/sprint/:sprintId/planning" element={<SprintPlanning projectId={currentProject.id} project={currentProject} />} />
             <Route path="/sprint/:sprintId/board" element={<SprintBoard projectId={currentProject.id} />} />
             <Route path="/sprint/:sprintId/report" element={<SprintReport projectId={currentProject.id} project={currentProject} />} />
+            <Route path="/project-report" element={<ProjectReport projectId={currentProject.id} />} />
             <Route path="/epics" element={<EpicsView projectId={currentProject.id} project={currentProject} />} />
             <Route path="/developers" element={<DeveloperList projectId={currentProject.id} />} />
             <Route path="/settings" element={<ProjectSettings project={currentProject} onUpdate={p => setCurrentProject(p)} />} />

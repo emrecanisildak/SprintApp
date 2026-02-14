@@ -117,6 +117,18 @@ function setupIpcHandlers() {
   ipcMain.handle('sprintStory:assignStory', (_, projectId, storyId, sprintId) => getProjectRepos(projectId).sprintStory.assignStory(storyId, sprintId));
   ipcMain.handle('sprintStory:unassignStory', (_, projectId, storyId) => getProjectRepos(projectId).sprintStory.unassignStory(storyId));
   ipcMain.handle('sprintStory:getSprintStats', (_, projectId, sprintId) => getProjectRepos(projectId).sprintStory.getSprintStats(sprintId));
+  ipcMain.handle('project:getProjectStats', (_, projectId) => {
+    const repos = getProjectRepos(projectId);
+    const sprints = repos.sprint.list() as any[];
+    const sprintIds = sprints.map((s: any) => s.id);
+    const stats = repos.sprintStory.getProjectStats(sprintIds);
+    // Attach sprint names
+    const sprintMap = Object.fromEntries(sprints.map((s: any) => [s.id, s.name]));
+    return {
+      ...stats,
+      sprint_stats: stats.sprint_stats.map((ss: any) => ({ ...ss, sprint_name: sprintMap[ss.sprint_id] || `Sprint ${ss.sprint_id}` })),
+    };
+  });
 
   // === Export handlers ===
   ipcMain.handle('export:printPage', async (_, projectId: number, sprintId: number) => {
@@ -134,6 +146,29 @@ function setupIpcHandlers() {
 
     if (!filePath) return { success: false, cancelled: true };
 
+    try {
+      const pdfData = await mainWindow.webContents.printToPDF({
+        printBackground: true,
+        landscape: false,
+        margins: { marginType: 'default' },
+      });
+      fs.writeFileSync(filePath, pdfData);
+      return { success: true, filePath };
+    } catch (error) {
+      console.error('Failed to generate PDF:', error);
+      return { success: false, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('export:printProjectReport', async (_, projectId: number) => {
+    if (!mainWindow) return { success: false };
+    const project = projectRepo.get(projectId) as any;
+    const defaultName = project ? `${project.name.replace(/\s+/g, '_')}_project_report.pdf` : 'project_report.pdf';
+    const { filePath } = await dialog.showSaveDialog(mainWindow, {
+      defaultPath: defaultName,
+      filters: [{ name: 'PDF', extensions: ['pdf'] }],
+    });
+    if (!filePath) return { success: false, cancelled: true };
     try {
       const pdfData = await mainWindow.webContents.printToPDF({
         printBackground: true,

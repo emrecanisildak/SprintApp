@@ -89,6 +89,27 @@ export interface DeveloperStat {
   story_count: number;
 }
 
+export interface ProjectStats {
+  total_sprints: number;
+  total_stories: number;
+  total_points: number;
+  completed_points: number;
+  completion_percent: number;
+  backlog_stories: number;
+  backlog_points: number;
+  sprint_stats: {
+    sprint_id: number;
+    sprint_name: string;
+    total_stories: number;
+    completed_stories: number;
+    total_points: number;
+    completed_points: number;
+    completion_percent: number;
+  }[];
+  developer_stats: DeveloperStat[];
+  epic_stats: EpicStat[];
+}
+
 export interface Status {
   id: number;
   name: string;
@@ -138,6 +159,7 @@ export interface ElectronAPI {
     assignStory: (projectId: number, storyId: number, sprintId: number) => Promise<void>;
     unassignStory: (projectId: number, storyId: number) => Promise<void>;
     getSprintStats: (projectId: number, sprintId: number) => Promise<SprintStats>;
+    getProjectStats: (projectId: number) => Promise<ProjectStats>;
   };
   status: {
     list: (projectId: number) => Promise<Status[]>;
@@ -147,6 +169,7 @@ export interface ElectronAPI {
   };
   exportPdf: {
     printPage: (projectId: number, sprintId: number) => Promise<{ success: boolean; filePath?: string; cancelled?: boolean }>;
+    printProjectReport: (projectId: number) => Promise<{ success: boolean; filePath?: string; cancelled?: boolean }>;
     saveSprintPlan: (projectId: number, sprintId: number) => Promise<{ success: boolean; filePath?: string; cancelled?: boolean }>;
     exportCsv: (projectId: number, sprintId: number) => Promise<{ success: boolean; filePath?: string; cancelled?: boolean }>;
     importCsv: (projectId: number, sprintId: number) => Promise<{ success: boolean; imported?: number; cancelled?: boolean }>;

@@ -40,6 +40,7 @@ const api = {
     assignStory: (projectId: number, storyId: number, sprintId: number) => ipcRenderer.invoke('sprintStory:assignStory', projectId, storyId, sprintId),
     unassignStory: (projectId: number, storyId: number) => ipcRenderer.invoke('sprintStory:unassignStory', projectId, storyId),
     getSprintStats: (projectId: number, sprintId: number) => ipcRenderer.invoke('sprintStory:getSprintStats', projectId, sprintId),
+    getProjectStats: (projectId: number) => ipcRenderer.invoke('project:getProjectStats', projectId),
   },
   status: {
     list: (projectId: number) => ipcRenderer.invoke('status:list', projectId),
@@ -49,6 +50,7 @@ const api = {
   },
   exportPdf: {
     printPage: (projectId: number, sprintId: number) => ipcRenderer.invoke('export:printPage', projectId, sprintId),
+    printProjectReport: (projectId: number) => ipcRenderer.invoke('export:printProjectReport', projectId),
     saveSprintPlan: (projectId: number, sprintId: number) => ipcRenderer.invoke('export:saveSprintPlan', projectId, sprintId),
     exportCsv: (projectId: number, sprintId: number) => ipcRenderer.invoke('export:csv', projectId, sprintId),
     importCsv: (projectId: number, sprintId: number) => ipcRenderer.invoke('export:importCsv', projectId, sprintId),

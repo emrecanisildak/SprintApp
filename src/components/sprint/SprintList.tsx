@@ -113,10 +113,16 @@ export default function SprintList({ projectId }: Props) {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-bold">Sprints</h2>
-        <button onClick={() => setShowForm(!showForm)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
-          + New Sprint
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => navigate('/project-report')}
+            className="px-4 py-2 border border-indigo-300 text-indigo-700 rounded-lg hover:bg-indigo-50 transition">
+            Project Report
+          </button>
+          <button onClick={() => setShowForm(!showForm)}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+            + New Sprint
+          </button>
+        </div>
       </div>
 
       {showForm && (
