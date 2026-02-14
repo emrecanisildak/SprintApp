@@ -22,6 +22,7 @@ export default function SprintPlanning({ projectId, project }: Props) {
   const { epics } = useEpics(projectId);
   const { members, refresh: refreshMembers } = useSprintMembers(projectId, sid);
   const [showStoryForm, setShowStoryForm] = useState(false);
+  const [editingStory, setEditingStory] = useState<Story | null>(null);
   const [allocations, setAllocations] = useState<Record<number, number>>({});
 
   useEffect(() => {
@@ -80,9 +81,14 @@ export default function SprintPlanning({ projectId, project }: Props) {
     setSprint({ ...sprint, status });
   };
 
-  const handleCreateStory = async (data: Partial<Story>) => {
-    await api.story.create(projectId, { ...data, sprint_id: sid });
-    setShowStoryForm(false);
+  const handleSaveStory = async (data: Partial<Story>) => {
+    if (editingStory) {
+      await api.story.update(projectId, editingStory.id, data);
+      setEditingStory(null);
+    } else {
+      await api.story.create(projectId, { ...data, sprint_id: sid });
+      setShowStoryForm(false);
+    }
     refreshSprint();
   };
 
@@ -195,16 +201,17 @@ export default function SprintPlanning({ projectId, project }: Props) {
             <button onClick={() => setShowStoryForm(!showStoryForm)}
               className="text-sm text-blue-600 hover:text-blue-800">+ New</button>
           </div>
-          {showStoryForm && (
+          {(showStoryForm || editingStory) && (
             <div className="mb-3">
-              <StoryForm epics={epics} developers={developers} onSave={handleCreateStory}
-                onCancel={() => setShowStoryForm(false)} />
+              <StoryForm story={editingStory} epics={epics} developers={developers} onSave={handleSaveStory}
+                onCancel={() => { setShowStoryForm(false); setEditingStory(null); }} />
             </div>
           )}
           <div className="space-y-2 max-h-[600px] overflow-auto">
             {sprintStories.map((story: Story) => (
               <StoryCard key={story.id} story={story} onStatusChange={handleStatusChange}
-                onEdit={() => {}} onDelete={async (id) => { await api.story.delete(projectId, id); refreshSprint(); }}
+                onEdit={(s) => { setEditingStory(s); setShowStoryForm(false); }}
+                onDelete={async (id) => { await api.story.delete(projectId, id); refreshSprint(); }}
                 onRemoveFromSprint={handleUnassignStory} />
             ))}
           </div>
