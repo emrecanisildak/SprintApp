@@ -43,11 +43,71 @@ Sprint planlama ve takip uygulaması. Birden fazla projeyi yönetebilen, sprint 
 - Developer bazli istatistikler (bar chart + tablo)
 - PDF export (standalone rapor)
 
+### Proje Raporu
+- Tum sprint'leri kapsayan proje geneli ozet rapor
+- Ozet kartlar: toplam sprint, story, SP, tamamlanma orani, backlog durumu
+- Sprint bazli ilerleme bar chart
+- Genel tamamlanma doughnut chart (tamamlanan / kalan / backlog)
+- Developer performans bar chart (tum sprint'ler genelinde)
+- Epic dagilimi doughnut chart
+- PDF export
+
 ### Import / Export
-- **CSV Export:** Sprint story'lerini CSV olarak disari aktar (Epic, Story, Description, Developer, SP, Status)
-- **CSV Import:** CSV dosyasindan story'leri sprint'e aktar. Olmayan developer ve epic otomatik olusturulur, bos status "Open" olarak atanir
-- **PDF Report Export:** Sprint raporu PDF olarak kaydet
+- **CSV Export:** Sprint story'lerini CSV olarak disari aktar
+- **CSV Import:** CSV dosyasindan story'leri sprint'e veya backlog'a aktar
+- **Status CSV Import:** Jira vb. sistemlerden story statuslerini toplu guncelle
+- **PDF Report Export:** Sprint raporu veya proje raporu PDF olarak kaydet
 - **PDF Plan Export:** Sprint plani PDF olarak kaydet (developer bazli kapasite ve story detaylari)
+
+## CSV Import Formatlari
+
+### Story Import (Sprint veya Backlog)
+
+Sprint listesindeki "Import CSV" butonu ile sprint'e, backlog sayfasindaki "Import CSV" butonu ile backlog'a story aktarabilirsiniz.
+
+**Format:**
+```
+Epic,Story,Description,Developer,Story Points,Status
+```
+
+**Ornek:**
+```csv
+Epic,Story,Description,Developer,Story Points,Status
+Auth,Login sayfasi,Kullanici giris ekrani,Ahmet,3,Open
+Auth,Sifre sifirlama,Email ile sifre sifirlama,Mehmet,5,Open
+Dashboard,Ana sayfa,Dashboard tasarimi,Ayse,8,In Progress
+,Teknik borc temizligi,Legacy kod refactor,,2,Open
+```
+
+**Kurallar:**
+- Ilk satir header olmali (yukaridaki format)
+- Epic ve Developer alanlari bossa sorunsuz calisir
+- Olmayan Epic ve Developer otomatik olusturulur
+- Status bossa projenin default statusu atanir
+- Ayni isimli story varsa guncellenir, yoksa yeni olusturulur
+- UTF-8 encoding desteklenir
+
+### Status Update Import
+
+Sprint listesindeki "Import Status" butonu ile Jira vb. sistemlerden export edilen CSV ile story statuslerini toplu guncelleyebilirsiniz.
+
+**Format:**
+```
+Story,Status
+```
+
+**Ornek:**
+```csv
+Story,Status
+Login sayfasi,Resolved
+Sifre sifirlama,In Progress
+Ana sayfa,Deployed
+```
+
+**Kurallar:**
+- Story basligi sprint'teki story ile eslestirilir (buyuk/kucuk harf duyarsiz)
+- Projede olmayan statusler otomatik olusturulur
+- Eslesmesi bulunamayan story'ler atlanir
 
 ## Kurulum
 
@@ -93,7 +153,7 @@ SprintApp/
 │   │   ├── project/          # ProjectForm, ProjectSettings, DeveloperList
 │   │   ├── backlog/          # BacklogView, StoryForm, StoryCard
 │   │   ├── sprint/           # SprintList, SprintPlanning, SprintBoard
-│   │   └── report/           # SprintReport, BurndownChart, DeveloperStats, EpicStats
+│   │   └── report/           # SprintReport, ProjectReport, BurndownChart, DeveloperStats, EpicStats
 │   ├── hooks/useDB.ts        # IPC bridge hooks
 │   ├── types/index.ts        # TypeScript tipleri
 │   └── utils/capacity.ts     # Kapasite hesaplama
