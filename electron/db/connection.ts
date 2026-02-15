@@ -24,8 +24,9 @@ export function getProjectDb(dbPath: string): Database.Database {
 }
 
 function getOrCreate(dbPath: string): Database.Database {
-  if (dbCache.has(dbPath)) {
-    return dbCache.get(dbPath)!;
+  const cached = dbCache.get(dbPath);
+  if (cached && cached.open) {
+    return cached;
   }
   const db = new Database(dbPath);
   db.pragma('journal_mode = WAL');
